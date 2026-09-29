@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>昭和・平成 レトロCRTテレビ & Webブラウザ・VHSシミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        crt: {
+                            green: '#00ff66',
+                            amber: '#ffb000',
+                            cyan: '#00e5ff',
+                            wood: '#4a2e18',
+                            woodDark: '#2d1a0d',
+                            cabinet: '#1f1e1c',
+                            bezel: '#121212'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['Courier New', 'Consolas', 'monospace'],
+                        sans: ['Inter', 'Hiragino Sans', 'Meiryo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121212;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff66;
+        }
+
+        /* CRT Pixel Font Styling for OSD */
+        .osd-text {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(0, 255, 102, 0.8), 0 0 12px rgba(0, 255, 102, 0.4);
+            letter-spacing: 1px;
+        }
+
+        /* Screen Glass Convexity & Reflection Styling */
+        .crt-glass-overlay {
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 60%),
+                        radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.65) 100%);
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.8), inset 0 0 100px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
+
+        /* Scanline Overlay for Pure CSS / Browser Overlay Mode */
+        .scanlines-overlay {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.35) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        /* Phosphor Subpixel Grid Overlay */
+        .aperture-grid {
+            background: repeating-linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.04) 0px,
+                rgba(255, 0, 0, 0.04) 1px,
+                rgba(0, 255, 0, 0.04) 1px,
+                rgba(0, 255, 0, 0.04) 2px,
+                rgba(0, 0, 255, 0.04) 2px,
+                rgba(0, 0, 255, 0.04) 3px
+            );
+            background-size: 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Wooden Cabinet Pattern */
+        .bg-wood-grain {
+            background-color: #3b2210;
+            background-image: 
+                radial-gradient(ellipse at 50% 50%, rgba(85, 45, 18, 0.6) 0%, rgba(30, 15, 5, 0.9) 100%),
+                linear-gradient(90deg, rgba(0,0,0,0.15) 0%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.2) 100%);
+            border-color: #5c381c;
+        }
+
+        /* Arcade Black Ribbed Pattern */
+        .bg-arcade-casing {
+            background-color: #1a1a1a;
+            background-image: repeating-linear-gradient(0deg, #222 0px, #222 2px, #181818 2px, #181818 4px);
+        }
+
+        /* Portable Red TV Pattern */
+        .bg-portable-red {
+            background-color: #b81d13;
+            background-image: radial-gradient(circle at 40% 20%, #d92b20 0%, #8c1008 100%);
+        }
+
+        /* Screen Aspect Ratio Container */
+        .aspect-crt-4-3 {
+            aspect-ratio: 4 / 3;
+        }
+
+        .aspect-crt-16-9 {
+            aspect-ratio: 16 / 9;
+        }
+
+        /* CRT Screen Curved Border Radius */
+        .crt-curved-corners {
+            border-radius: 4% / 5%;
+            overflow: hidden;
+        }
+
+        /* Subtle Screen Flicker Animation */
+        @keyframes crtFlicker {
+            0% { opacity: 0.992; }
+            50% { opacity: 1; }
+            52% { opacity: 0.96; }
+            54% { opacity: 1; }
+            80% { opacity: 0.985; }
+            100% { opacity: 0.992; }
+        }
+
+        .animate-flicker {
+            animation: crtFlicker 0.15s infinite;
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
+
+    <!-- TOP CONTROL BAR / HEADER -->
+    <header class="bg-zinc-900/90 border-b border-zinc-800 backdrop-blur px-3 py-2 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-red-600 flex items-center justify-center shadow-lg shadow-amber-900/40">
+                    <i class="fa-solid font-bold text-white text-sm fa-tv"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm sm:text-base leading-tight tracking-wide text-zinc-100 flex items-center gap-2">
+                        <span>昭和・平成 レトロCRTテレビ</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 font-mono border border-emerald-700/50">v2.5 Full Pro</span>
+                    </h1>
+                    <p class="text-[10px] text-zinc-400 hidden sm:block">WebGL CRT Shader / VHS Simulation & Interactive Web Browser Engine</p>
+                </div>
+            </div>
+
+            <!-- Mode Switchers & Ratio Toggle -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Mode Toggle Buttons -->
+                <div class="bg-zinc-950 p-1 rounded-lg border border-zinc-800 flex items-center text-xs">
+                    <button id="btn-mode-video" onclick="switchMainMode('video')" class="px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 bg-emerald-600 text-white shadow">
+                        <i class="fa-solid fa-tape"></i>
+                        <span>📼 MP4動画 / テスト信号</span>
+                    </button>
+                    <button id="btn-mode-web" onclick="switchMainMode('web')" class="px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>🌐 Webサイト閲覧</span>
+                    </button>
+                </div>
+
+                <!-- Aspect Ratio Switcher -->
+                <div class="bg-zinc-950 p-1 rounded-lg border border-zinc-800 flex items-center text-xs">
+                    <button id="btn-aspect-43" onclick="setAspectRatio('4:3')" class="px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all bg-zinc-800 text-amber-400 border border-amber-500/30">
+                        4:3 レトロ
+                    </button>
+                    <button id="btn-aspect-169" onclick="setAspectRatio('16:9')" class="px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all text-zinc-400 hover:text-zinc-200">
+                        16:9 ワイド
+                    </button>
+                </div>
+
+                <!-- Mute Master Button -->
+                <button id="btn-master-mute" onclick="toggleMasterMute()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-colors">
+                    <i id="icon-master-mute" class="fa-solid fa-volume-high text-emerald-400"></i>
+                    <span id="text-master-mute">音声 ON</span>
+                </button>
+
+                <!-- Screen Recording Button -->
+                <button id="btn-record" onclick="toggleScreenRecording()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-700/60 flex items-center gap-1.5 transition-all shadow-md">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                    <span id="text-record">🔴 録画開始</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- WEB BROWSER TOOLBAR (Visible only in WEB mode) -->
+    <div id="web-browser-bar" class="hidden bg-zinc-900 border-b border-zinc-800 px-3 py-2 transition-all">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center gap-2 text-xs">
+            
+            <!-- Navigation Controls -->
+            <div class="flex items-center gap-1">
+                <button onclick="reloadWebIframe()" class="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300" title="読み込み直し (Reload)">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button onclick="loadWebBookmark('https://ja.wikipedia.org/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8')" class="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300" title="ホーム (Home)">
+                    <i class="fa-solid fa-house"></i>
+                </button>
+            </div>
+
+            <!-- Address Input Form -->
+            <form onsubmit="handleWebUrlSubmit(event)" class="flex-1 min-w-[240px] flex items-center gap-1">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-lock text-zinc-500 absolute left-2.5 top-2.5 text-[10px]"></i>
+                    <input id="web-url-input" type="text" value="https://ja.wikipedia.org/wiki/メインページ" placeholder="https://example.com" class="w-full bg-zinc-950 border border-zinc-700 rounded pl-7 pr-3 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono text-xs">
+                </div>
+                <button type="submit" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded flex items-center gap-1">
+                    <span>開く</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+            </form>
+
+            <!-- Proxy Selection Dropdown -->
+            <div class="flex items-center gap-1.5 bg-zinc-950 border border-zinc-700 rounded px-2 py-1">
+                <i class="fa-solid fa-network-wired text-amber-500 text-[11px]"></i>
+                <label for="proxy-select" class="text-zinc-400 text-[11px] whitespace-nowrap">プロキシ:</label>
+                <select id="proxy-select" onchange="onProxyChange()" class="bg-transparent text-zinc-200 focus:outline-none font-mono text-xs cursor-pointer">
+                    <option value="direct">直接埋め込み (Direct)</option>
+                    <option value="corsproxy" selected>CorsProxy.io (おすすめ)</option>
+                    <option value="allorigins">AllOrigins API</option>
+                    <option value="codetabs">CodeTabs Proxy</option>
+                </select>
+            </div>
+
+            <!-- Quick Bookmarks -->
+            <div class="w-full sm:w-auto flex flex-wrap items-center gap-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-zinc-800">
+                <span class="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mr-1">ブックマーク:</span>
+                <button onclick="loadWebBookmark('https://ja.wikipedia.org/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 text-[11px]">Wikipedia</button>
+                <button onclick="loadWebBookmark('https://archive.org')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 text-[11px]">Internet Archive</button>
+                <button onclick="loadWebBookmark('https://www.bing.com')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 text-[11px]">Bing 検索</button>
+                <button onclick="loadWebBookmark('https://news.yahoo.co.jp')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 text-[11px]">Yahoo! ニュース</button>
+                <button onclick="loadWebBookmark('https://www.google.com')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 text-[11px]">Google</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 flex flex-col items-center justify-center gap-4">
+        
+        <!-- CRT TV CONTAINER FRAME (Cabinet Styles: Wood, Black, Red Portable, Frameless) -->
+        <div id="tv-cabinet" class="w-full max-w-4xl bg-wood-grain rounded-2xl p-4 sm:p-8 shadow-2xl border-4 border-amber-900/60 transition-all duration-300 relative flex flex-col md:flex-row gap-4 items-stretch">
+            
+            <!-- Left / Main: The CRT Tube Screen Box -->
+            <div class="flex-1 flex flex-col items-center justify-center">
+                
+                <div id="screen-viewport-box" class="w-full aspect-crt-4-3 crt-curved-corners bg-black relative border-8 border-zinc-900 shadow-inner overflow-hidden flex items-center justify-center group">
+                    
+                    <!-- 1. VIDEO / TEST SIGNAL MODE: WebGL Canvas -->
+                    <canvas id="crt-gl-canvas" class="w-full h-full block object-cover absolute inset-0 z-10"></canvas>
+
+                    <!-- 2. WEB BROWSER MODE: Interactive HTML Iframe -->
+                    <div id="web-mode-container" class="w-full h-full absolute inset-0 z-0 hidden bg-white">
+                        <iframe id="web-iframe" src="https://ja.wikipedia.org/wiki/メインページ" class="w-full h-full border-0"></iframe>
+                    </div>
+
+                    <!-- 3. CRT BROWSER OVERLAY LAYER (Scanlines, Vignette, Reflection, OSD over iframe) -->
+                    <div id="crt-browser-overlay" class="w-full h-full absolute inset-0 z-20 pointer-events-none hidden flex flex-col justify-between p-4">
+                        <!-- Scanline and Phosphor Layer -->
+                        <div class="absolute inset-0 scanlines-overlay opacity-80 pointer-events-none"></div>
+                        <div class="absolute inset-0 aperture-grid opacity-50 pointer-events-none"></div>
+                        <div id="css-curvature-vignette" class="absolute inset-0 crt-glass-overlay pointer-events-none"></div>
+                        
+                        <!-- CRT Glass Reflection Sheen -->
+                        <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none"></div>
+                    </div>
+
+                    <!-- OSD (On Screen Display) HUD Indicators -->
+                    <div id="osd-hud" class="absolute top-4 left-4 z-30 pointer-events-none font-mono osd-text text-emerald-400 text-sm sm:text-base flex flex-col gap-1 transition-opacity">
+                        <div class="flex items-center gap-2">
+                            <span id="osd-mode-tag" class="bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">PLAY 📼</span>
+                            <span id="osd-channel-tag" class="bg-zinc-900/80 px-2 py-0.5 rounded text-amber-400 border border-amber-500/40">CH 03</span>
+                        </div>
+                        <div id="osd-rec-status" class="hidden text-red-500 flex items-center gap-1 text-xs">
+                            <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                            <span>REC <span id="rec-timer">00:00</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Audio Frequency Indicator Badge OSD Bottom Right -->
+                    <div class="absolute bottom-3 right-4 z-30 pointer-events-none font-mono osd-text text-amber-400/80 text-xs hidden sm:block">
+                        <span id="osd-sound-info">NTSC-J 15.734kHz</span>
+                    </div>
+
+                </div>
+
+                <!-- Video Timeline Controls Bar (For Video Mode) -->
+                <div id="video-controls-bar" class="w-full bg-zinc-950/90 border border-zinc-800 rounded-lg p-2 mt-2 flex items-center gap-3 text-xs z-30">
+                    <button id="btn-video-play" onclick="toggleVideoPlay()" class="w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow transition">
+                        <i id="icon-play" class="fa-solid fa-play ml-0.5"></i>
+                    </button>
+                    
+                    <!-- Progress Bar -->
+                    <div class="flex-1 flex items-center gap-2">
+                        <span id="time-current" class="font-mono text-zinc-400 text-[11px]">00:00</span>
+                        <input id="video-scrubber" type="range" min="0" max="100" value="0" step="0.1" oninput="seekVideo(this.value)" class="flex-1 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                        <span id="time-duration" class="font-mono text-zinc-400 text-[11px]">00:00</span>
+                    </div>
+
+                    <!-- File Video Upload Input Button -->
+                    <label class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded cursor-pointer flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-video text-amber-400"></i>
+                        <span>動画ファイル選択</span>
+                        <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg" onchange="handleVideoFileUpload(event)" class="hidden">
+                    </label>
+                </div>
+
+            </div>
+
+            <!-- Right / Side Panel: TV Cabinet Controls (Rotary Dial, Speaker Grill, Power Switch) -->
+            <div id="tv-cabinet-side-panel" class="w-full md:w-56 bg-zinc-950/60 rounded-xl border border-amber-900/40 p-3 flex flex-col justify-between gap-3 text-zinc-300">
+                
+                <!-- Channel Selector Dial & Brand Tag -->
+                <div class="flex flex-col items-center gap-2 text-center border-b border-zinc-800/80 pb-3">
+                    <div class="text-[10px] tracking-widest font-mono text-amber-500 uppercase font-bold">NATIONAL COLOR TV</div>
+                    
+                    <!-- Analog Rotary Channel Switch Knob -->
+                    <div class="flex items-center gap-3 my-1">
+                        <div class="relative w-14 h-14 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-600 border-2 border-amber-700/60 shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform" onclick="rotateChannelDial()">
+                            <div id="channel-dial-indicator" class="w-1 h-5 bg-amber-400 absolute top-1 rounded transform transition-transform duration-300 origin-bottom" style="transform: rotate(0deg)"></div>
+                            <div class="w-6 h-6 rounded-full bg-zinc-900 border border-zinc-700"></div>
+                        </div>
+                        <div class="text-left font-mono">
+                            <div class="text-[10px] text-zinc-500">CHANNEL</div>
+                            <div id="dial-channel-num" class="text-lg font-bold text-emerald-400">VHF 03</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speaker Mesh Grill Effect -->
+                <div class="flex-1 min-h-[60px] bg-zinc-900 rounded-lg border border-zinc-800 p-2 flex flex-col gap-1 justify-center opacity-80">
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                    <div class="h-1 bg-zinc-950 rounded-full"></div>
+                </div>
+
+                <!-- Quick Hardware Toggles on Cabinet -->
+                <div class="space-y-2 pt-1 border-t border-zinc-800">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-zinc-400">ブラウン管キーン音 (15.7kHz)</span>
+                        <input id="chk-flyback" type="checkbox" onchange="toggleFlybackSound(this.checked)" class="w-4 h-4 accent-emerald-500 rounded cursor-pointer" checked>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-zinc-400">TV砂嵐ノイズ音</span>
+                        <input id="chk-static-sound" type="checkbox" onchange="toggleStaticSound(this.checked)" class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CONTROL PANELS DRAWER (Tabbed Controls: 映像調整, 音響設定, 外枠デザイン, プリセット) -->
+        <div class="w-full max-w-4xl bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 shadow-xl backdrop-blur">
+            
+            <!-- Tabs Header -->
+            <div class="flex border-b border-zinc-800 gap-2 mb-4 overflow-x-auto pb-1 text-xs sm:text-sm font-medium">
+                <button id="tab-btn-presets" onclick="switchControlTab('presets')" class="px-4 py-2 border-b-2 border-emerald-500 text-emerald-400 font-bold flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>ワンタッチプリセット</span>
+                </button>
+                <button id="tab-btn-shader" onclick="switchControlTab('shader')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>CRT & VHS 映像詳細調整</span>
+                </button>
+                <button id="tab-btn-audio" onclick="switchControlTab('audio')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>アナログ音響合成</span>
+                </button>
+                <button id="tab-btn-frame" onclick="switchControlTab('frame')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-tv"></i>
+                    <span>キャビネット外枠</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: PRESETS PANEL -->
+            <div id="tab-content-presets" class="tab-content grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                <button onclick="applyPreset('vhs80s')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">📼</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">80年代VHS</div>
+                    <div class="text-[10px] text-zinc-500">色収差+テープノイズ</div>
+                </button>
+
+                <button onclick="applyPreset('showaTV')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">📺</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">昭和アナログTV</div>
+                    <div class="text-[10px] text-zinc-500">木目調+走査線+15kHz</div>
+                </button>
+
+                <button onclick="applyPreset('arcade')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">🎮</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">レトロアーケード</div>
+                    <div class="text-[10px] text-zinc-500">シャドウマスク+高クッキリ</div>
+                </button>
+
+                <button onclick="applyPreset('bwTV')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">📻</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">懐かしの白黒TV</div>
+                    <div class="text-[10px] text-zinc-500">モノクロ+強い歪み</div>
+                </button>
+
+                <button onclick="applyPreset('retroWeb')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">🌐</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">レトロWeb</div>
+                    <div class="text-[10px] text-zinc-500">ブラウザ向けマイルド</div>
+                </button>
+
+                <button onclick="applyPreset('junkNoise')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-left transition hover:border-emerald-500 group">
+                    <div class="text-xl mb-1">⚡</div>
+                    <div class="font-bold text-xs text-zinc-200 group-hover:text-emerald-400">極太ジャンクノイズ</div>
+                    <div class="text-[10px] text-zinc-500">激しいトラッキングブレ</div>
+                </button>
+            </div>
+
+            <!-- TAB 2: SHADER PARAMETERS PANEL -->
+            <div id="tab-content-shader" class="tab-content hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                
+                <!-- Curvature -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>ブラウン管の樽型歪み (Curvature)</span>
+                        <span id="val-curvature" class="font-mono text-emerald-400">0.15</span>
+                    </div>
+                    <input id="slider-curvature" type="range" min="0" max="0.4" step="0.01" value="0.15" oninput="updateShaderParam('curvature', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Scanlines Intensity -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>走査線の濃さ (Scanlines)</span>
+                        <span id="val-scanlines" class="font-mono text-emerald-400">0.40</span>
+                    </div>
+                    <input id="slider-scanlines" type="range" min="0" max="1.0" step="0.02" value="0.40" oninput="updateShaderParam('scanlines', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Chromatic Aberration -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>RGB色収差 (RGB Shift)</span>
+                        <span id="val-chroma" class="font-mono text-emerald-400">0.005</span>
+                    </div>
+                    <input id="slider-chroma" type="range" min="0" max="0.02" step="0.001" value="0.005" oninput="updateShaderParam('chroma', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- VHS Tracking Distortion -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>VHSトラッキングノイズ (VHS Glitch)</span>
+                        <span id="val-vhs" class="font-mono text-emerald-400">0.20</span>
+                    </div>
+                    <input id="slider-vhs" type="range" min="0" max="1.0" step="0.02" value="0.20" oninput="updateShaderParam('vhs', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Phosphor Bloom & Glow -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>蛍光体発光ブルーム (Phosphor Glow)</span>
+                        <span id="val-glow" class="font-mono text-emerald-400">0.30</span>
+                    </div>
+                    <input id="slider-glow" type="range" min="0" max="1.0" step="0.05" value="0.30" oninput="updateShaderParam('glow', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Shadowmask Subpixel Grid -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>シャドウマスク格子 (Shadow Mask)</span>
+                        <span id="val-mask" class="font-mono text-emerald-400">0.35</span>
+                    </div>
+                    <input id="slider-mask" type="range" min="0" max="1.0" step="0.05" value="0.35" oninput="updateShaderParam('mask', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Flicker / Jitter -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>画面ちらつき・フリッカー (Flicker)</span>
+                        <span id="val-flicker" class="font-mono text-emerald-400">0.15</span>
+                    </div>
+                    <input id="slider-flicker" type="range" min="0" max="1.0" step="0.05" value="0.15" oninput="updateShaderParam('flicker', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Color Filter Mode -->
+                <div class="space-y-1">
+                    <label class="block text-zinc-300">カラーモード</label>
+                    <select id="color-mode-select" onchange="updateShaderParam('colorMode', this.value)" class="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-zinc-200">
+                        <option value="0">フルカラー (RGB)</option>
+                        <option value="1">モノクロ (白黒TV)</option>
+                        <option value="2">セピアアンバー (極高解像度)</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <!-- TAB 3: ANALOG AUDIO PANEL -->
+            <div id="tab-content-audio" class="tab-content hidden grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                
+                <!-- Flyback Transformer Volume -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>15.734 kHz 高周波キーン音 音量</span>
+                        <span id="val-vol-flyback" class="font-mono text-emerald-400">0.05</span>
+                    </div>
+                    <input id="slider-vol-flyback" type="range" min="0" max="0.3" step="0.01" value="0.05" oninput="updateAudioVolume('flyback', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Static RF Noise Volume -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>砂嵐ノイズ音 音量</span>
+                        <span id="val-vol-static" class="font-mono text-emerald-400">0.00</span>
+                    </div>
+                    <input id="slider-vol-static" type="range" min="0" max="0.5" step="0.01" value="0.00" oninput="updateAudioVolume('static', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+                <!-- Video Audio Volume -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-zinc-300">
+                        <span>動画音声 音量</span>
+                        <span id="val-vol-video" class="font-mono text-emerald-400">0.80</span>
+                    </div>
+                    <input id="slider-vol-video" type="range" min="0" max="1.0" step="0.02" value="0.80" oninput="updateAudioVolume('video', this.value)" class="w-full h-1.5 bg-zinc-800 rounded appearance-none accent-emerald-500 cursor-pointer">
+                </div>
+
+            </div>
+
+            <!-- TAB 4: CABINET FRAME DESIGN -->
+            <div id="tab-content-frame" class="tab-content hidden grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <button onclick="setCabinetStyle('wood')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-center transition hover:border-amber-500">
+                    <div class="w-full h-10 rounded bg-wood-grain mb-2 border border-amber-900"></div>
+                    <div class="font-bold text-xs text-zinc-200">昭和木目調テレビ</div>
+                    <div class="text-[10px] text-zinc-500">1970年代アンティーク</div>
+                </button>
+
+                <button onclick="setCabinetStyle('arcade')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-center transition hover:border-amber-500">
+                    <div class="w-full h-10 rounded bg-arcade-casing mb-2 border border-zinc-700"></div>
+                    <div class="font-bold text-xs text-zinc-200">80s ブラックモニター</div>
+                    <div class="text-[10px] text-zinc-500">アーケード・トリニトロン</div>
+                </button>
+
+                <button onclick="setCabinetStyle('portable')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-center transition hover:border-amber-500">
+                    <div class="w-full h-10 rounded bg-portable-red mb-2 border border-red-900"></div>
+                    <div class="font-bold text-xs text-zinc-200">ポータブル赤TV</div>
+                    <div class="text-[10px] text-zinc-500">昭和レトロ ポップ</div>
+                </button>
+
+                <button onclick="setCabinetStyle('frameless')" class="p-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-center transition hover:border-amber-500">
+                    <div class="w-full h-10 rounded bg-zinc-900 mb-2 border border-zinc-700"></div>
+                    <div class="font-bold text-xs text-zinc-200">フレームレス</div>
+                    <div class="text-[10px] text-zinc-500">ガラス画面のみ</div>
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Hidden HTML5 Video Element for Texture Source -->
+    <video id="source-video" class="hidden" loop crossorigin="anonymous" playsinline></video>
+
+    <!-- Hidden 2D Canvas for Procedural SMPTE Color Bar Generator -->
+    <canvas id="smpte-canvas" width="640" height="480" class="hidden"></canvas>
+
+    <!-- JAVASCRIPT ENGINE & WEBGL CRT SHADER PROGRAM -->
+    <script>
+        // Global App State
+        let currentMode = 'video'; // 'video' | 'web'
+        let isMasterMuted = false;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let recordStartTime = 0;
+        let recordTimerInterval = null;
+        let channelIndex = 3;
+
+        // Web Audio Synthesizer variables
+        let audioCtx = null;
+        let flybackOsc = null;
+        let flybackGain = null;
+        let staticSource = null;
+        let staticGain = null;
+        let smpteToneOsc = null;
+        let audioDestination = null; // For screen recorder audio mix
+
+        // Shader parameters state
+        const shaderParams = {
+            curvature: 0.15,
+            scanlines: 0.40,
+            chroma: 0.005,
+            vhs: 0.20,
+            glow: 0.30,
+            mask: 0.35,
+            flicker: 0.15,
+            colorMode: 0 // 0: Normal RGB, 1: B&W, 2: Amber
+        };
+
+        // DOM Element references
+        const glCanvas = document.getElementById('crt-gl-canvas');
+        const sourceVideo = document.getElementById('source-video');
+        const smpteCanvas = document.getElementById('smpte-canvas');
+        const webIframe = document.getElementById('web-iframe');
+        const webModeContainer = document.getElementById('web-mode-container');
+        const crtBrowserOverlay = document.getElementById('crt-browser-overlay');
+        const videoControlsBar = document.getElementById('video-controls-bar');
+        const webBrowserBar = document.getElementById('web-browser-bar');
+
+        // WebGL CRT Shader Source Code
+        const vsSource = `
+            attribute vec2 aPosition;
+            attribute vec2 aTexCoord;
+            varying vec2 vTexCoord;
+            void main() {
+                vTexCoord = aTexCoord;
+                gl_Position = vec4(aPosition, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying vec2 vTexCoord;
+            uniform sampler2D uTexture;
+            uniform float uTime;
+            
+            // Uniform Controls
+            uniform float uCurvature;
+            uniform float uScanlines;
+            uniform float uChroma;
+            uniform float uVHS;
+            uniform float uGlow;
+            uniform float uMask;
+            uniform float uFlicker;
+            uniform int uColorMode;
+
+            // Barrel Distortion / Barrel Curvature
+            vec2 curveUV(vec2 uv) {
+                uv = uv * 2.0 - 1.0;
+                vec2 offset = abs(uv.yx) * vec2(uCurvature);
+                uv = uv + uv * offset * offset;
+                uv = uv * 0.5 + 0.5;
+                return uv;
+            }
+
+            // Pseudo Noise Generator
+            float rand(vec2 co) {
+                return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            void main() {
+                vec2 uv = curveUV(vTexCoord);
+
+                // Vignette dark border check
+                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                    return;
+                }
+
+                // VHS Horizontal Scanline Offset Distortion (Tracking Noise)
+                if (uVHS > 0.0) {
+                    float glitch = sin(uv.y * 30.0 + uTime * 10.0) * uVHS * 0.015;
+                    if (rand(vec2(uTime, uv.y)) > 0.96) {
+                        glitch += (rand(vec2(uTime * 2.0, uv.y)) - 0.5) * uVHS * 0.08;
+                    }
+                    uv.x += glitch;
+                }
+
+                // Chromatic Aberration / RGB Split
+                vec4 col;
+                if (uChroma > 0.0) {
+                    float r = texture2D(uTexture, vec2(uv.x + uChroma, uv.y)).r;
+                    float g = texture2D(uTexture, uv).g;
+                    float b = texture2D(uTexture, vec2(uv.x - uChroma, uv.y)).b;
+                    col = vec4(r, g, b, 1.0);
+                } else {
+                    col = texture2D(uTexture, uv);
+                }
+
+                // Scanline Effect
+                if (uScanlines > 0.0) {
+                    float scanline = sin(uv.y * 800.0) * 0.5 + 0.5;
+                    col.rgb -= scanline * uScanlines * 0.35;
+                }
+
+                // Shadow Mask / Aperture Grille RGB Subpixel Grid
+                if (uMask > 0.0) {
+                    float mask = mod(gl_FragCoord.x, 3.0);
+                    if (mask < 1.0) col.r *= (1.0 + uMask * 0.3);
+                    else if (mask < 2.0) col.g *= (1.0 + uMask * 0.3);
+                    else col.b *= (1.0 + uMask * 0.3);
+                }
+
+                // Screen Flicker
+                if (uFlicker > 0.0) {
+                    float f = 1.0 - (rand(vec2(uTime, 0.0)) * uFlicker * 0.12);
+                    col.rgb *= f;
+                }
+
+                // Color Filtering Mode (0: RGB, 1: Monochromatic, 2: Sepia)
+                if (uColorMode == 1) {
+                    float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+                    col.rgb = vec3(gray);
+                } else if (uColorMode == 2) {
+                    float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+                    col.rgb = vec3(gray * 1.0, gray * 0.8, gray * 0.4);
+                }
+
+                // CRT Phosphor Bloom / Inset Edge Vignette
+                float vig = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
+                vig = clamp(pow(16.0 * vig, 0.25), 0.0, 1.0);
+                col.rgb *= vig;
+
+                gl_FragColor = col;
+            }
+        `;
+
+        let gl, program, texture;
+        let uLocations = {};
+
+        function initWebGL() {
+            gl = glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl');
+            if (!gl) {
+                console.error('WebGL is not supported in this browser.');
+                return;
+            }
+
+            // Shader Compilation
+            const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+            program = createProgram(gl, vs, fs);
+            gl.useProgram(program);
+
+            // Quad Vertices
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -1, -1,  1, -1, -1,  1,
+                -1,  1,  1, -1,  1,  1,
+            ]), gl.STATIC_DRAW);
+
+            const aPosition = gl.getAttribLocation(program, 'aPosition');
+            gl.enableVertexAttribArray(aPosition);
+            gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+            const texCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                0, 1,  1, 1,  0, 0,
+                0, 0,  1, 1,  1, 0,
+            ]), gl.STATIC_DRAW);
+
+            const aTexCoord = gl.getAttribLocation(program, 'aTexCoord');
+            gl.enableVertexAttribArray(aTexCoord);
+            gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
+
+            // Fetch Uniform Locations
+            uLocations = {
+                uTexture: gl.getUniformLocation(program, 'uTexture'),
+                uTime: gl.getUniformLocation(program, 'uTime'),
+                uCurvature: gl.getUniformLocation(program, 'uCurvature'),
+                uScanlines: gl.getUniformLocation(program, 'uScanlines'),
+                uChroma: gl.getUniformLocation(program, 'uChroma'),
+                uVHS: gl.getUniformLocation(program, 'uVHS'),
+                uGlow: gl.getUniformLocation(program, 'uGlow'),
+                uMask: gl.getUniformLocation(program, 'uMask'),
+                uFlicker: gl.getUniformLocation(program, 'uFlicker'),
+                uColorMode: gl.getUniformLocation(program, 'uColorMode')
+            };
+
+            // Texture Setup
+            texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        }
+
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function createProgram(gl, vs, fs) {
+            const prog = gl.createProgram();
+            gl.attachShader(prog, vs);
+            gl.attachShader(prog, fs);
+            gl.linkProgram(prog);
+            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+                console.error(gl.getProgramInfoLog(prog));
+                return null;
+            }
+            return prog;
+        }
+
+        function drawSMPTEPattern() {
+            const ctx = smpteCanvas.getContext('2d');
+            const w = smpteCanvas.width;
+            const h = smpteCanvas.height;
+
+            // SMPTE Top Color Bars
+            const colorsTop = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
+            const barW = w / 7;
+            colorsTop.forEach((color, i) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(i * barW, 0, barW, h * 0.67);
+            });
+
+            // SMPTE Middle Cast Bars
+            const colorsMid = ['#0000c0', '#131313', '#c000c0', '#131313', '#00c0c0', '#131313', '#c0c0c0'];
+            colorsMid.forEach((color, i) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(i * barW, h * 0.67, barW, h * 0.08);
+            });
+
+            // SMPTE Bottom Bars
+            ctx.fillStyle = '#00214c'; ctx.fillRect(0, h * 0.75, w * 0.18, h * 0.25);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(w * 0.18, h * 0.75, w * 0.18, h * 0.25);
+            ctx.fillStyle = '#32006a'; ctx.fillRect(w * 0.36, h * 0.75, w * 0.18, h * 0.25);
+            ctx.fillStyle = '#131313'; ctx.fillRect(w * 0.54, h * 0.75, w * 0.46, h * 0.25);
+
+            // Add Retro Text Overlay
+            ctx.fillStyle = '#00ff66';
+            ctx.font = 'bold 24px monospace';
+            ctx.fillText('NTSC-J TEST PATTERN 1kHz', 30, 40);
+        }
+
+        function initWebAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            audioDestination = audioCtx.createMediaStreamDestination();
+
+            // 1. 15.734 kHz Flyback Transformer High-Pitch CRT Whine Sound
+            flybackOsc = audioCtx.createOscillator();
+            flybackGain = audioCtx.createGain();
+            flybackOsc.type = 'sine';
+            flybackOsc.frequency.value = 15734; // Authentic CRT horizontal flyback frequency
+            flybackGain.gain.value = 0.05; // Soft volume default
+            flybackOsc.connect(flybackGain);
+            flybackGain.connect(audioCtx.destination);
+            flybackGain.connect(audioDestination);
+            flybackOsc.start();
+
+            // 2. RF Static Noise Sound
+            const bufferSize = audioCtx.sampleRate * 2;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            staticSource = audioCtx.createBufferSource();
+            staticSource.buffer = noiseBuffer;
+            staticSource.loop = true;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.value = 2000;
+
+            staticGain = audioCtx.createGain();
+            staticGain.gain.value = 0.00; // Muted by default
+
+            staticSource.connect(noiseFilter);
+            noiseFilter.connect(staticGain);
+            staticGain.connect(audioCtx.destination);
+            staticGain.connect(audioDestination);
+            staticSource.start();
+
+            // 3. 1kHz SMPTE Test Tone
+            smpteToneOsc = audioCtx.createOscillator();
+            const smpteToneGain = audioCtx.createGain();
+            smpteToneOsc.frequency.value = 1000;
+            smpteToneGain.gain.value = 0.02;
+            smpteToneOsc.connect(smpteToneGain);
+            smpteToneGain.connect(audioCtx.destination);
+            smpteToneGain.connect(audioDestination);
+            smpteToneOsc.start();
+        }
+
+        function toggleFlybackSound(enabled) {
+            initWebAudio();
+            if (!flybackGain) return;
+            const vol = parseFloat(document.getElementById('slider-vol-flyback').value);
+            flybackGain.gain.value = enabled ? vol : 0;
+        }
+
+        function toggleStaticSound(enabled) {
+            initWebAudio();
+            if (!staticGain) return;
+            const vol = parseFloat(document.getElementById('slider-vol-static').value);
+            staticGain.gain.value = enabled ? vol : 0;
+        }
+
+        function updateAudioVolume(type, val) {
+            initWebAudio();
+            const num = parseFloat(val);
+            if (type === 'flyback') {
+                document.getElementById('val-vol-flyback').innerText = num.toFixed(2);
+                if (flybackGain && document.getElementById('chk-flyback').checked) {
+                    flybackGain.gain.value = num;
+                }
+            } else if (type === 'static') {
+                document.getElementById('val-vol-static').innerText = num.toFixed(2);
+                if (staticGain && document.getElementById('chk-static-sound').checked) {
+                    staticGain.gain.value = num;
+                }
+            } else if (type === 'video') {
+                document.getElementById('val-vol-video').innerText = num.toFixed(2);
+                sourceVideo.volume = num;
+            }
+        }
+
+        function toggleMasterMute() {
+            initWebAudio();
+            isMasterMuted = !isMasterMuted;
+            const text = document.getElementById('text-master-mute');
+            const icon = document.getElementById('icon-master-mute');
+
+            if (isMasterMuted) {
+                if (audioCtx) audioCtx.suspend();
+                sourceVideo.muted = true;
+                text.innerText = '消音中';
+                icon.className = 'fa-solid fa-volume-xmark text-red-400';
+            } else {
+                if (audioCtx) audioCtx.resume();
+                sourceVideo.muted = false;
+                text.innerText = '音声 ON';
+                icon.className = 'fa-solid fa-volume-high text-emerald-400';
+            }
+        }
+
+        function switchMainMode(mode) {
+            currentMode = mode;
+            const btnVideo = document.getElementById('btn-mode-video');
+            const btnWeb = document.getElementById('btn-mode-web');
+            const osdTag = document.getElementById('osd-mode-tag');
+
+            if (mode === 'video') {
+                btnVideo.className = "px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 bg-emerald-600 text-white shadow";
+                btnWeb.className = "px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200";
+                
+                videoControlsBar.classList.remove('hidden');
+                webBrowserBar.classList.add('hidden');
+                webModeContainer.classList.add('hidden');
+                crtBrowserOverlay.classList.add('hidden');
+                glCanvas.classList.remove('hidden');
+
+                osdTag.innerText = "PLAY 📼";
+            } else {
+                btnWeb.className = "px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 bg-emerald-600 text-white shadow";
+                btnVideo.className = "px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200";
+
+                videoControlsBar.classList.add('hidden');
+                webBrowserBar.classList.remove('hidden');
+                webModeContainer.classList.remove('hidden');
+                crtBrowserOverlay.classList.remove('hidden');
+                glCanvas.classList.add('hidden');
+
+                osdTag.innerText = "WEB 🌐";
+                sourceVideo.pause();
+            }
+        }
+
+        // Web Address Bar Form submit
+        function handleWebUrlSubmit(e) {
+            e.preventDefault();
+            let url = document.getElementById('web-url-input').value.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+                document.getElementById('web-url-input').value = url;
+            }
+            loadIframeWithProxy(url);
+        }
+
+        function loadWebBookmark(url) {
+            document.getElementById('web-url-input').value = url;
+            loadIframeWithProxy(url);
+        }
+
+        function onProxyChange() {
+            const url = document.getElementById('web-url-input').value.trim();
+            loadIframeWithProxy(url);
+        }
+
+        function loadIframeWithProxy(url) {
+            const proxy = document.getElementById('proxy-select').value;
+            let finalUrl = url;
+
+            if (proxy === 'corsproxy') {
+                finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+            } else if (proxy === 'allorigins') {
+                finalUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+            } else if (proxy === 'codetabs') {
+                finalUrl = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url);
+            }
+
+            webIframe.src = finalUrl;
+        }
+
+        function reloadWebIframe() {
+            webIframe.src = webIframe.src;
+        }
+
+        function handleVideoFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const fileURL = URL.createObjectURL(file);
+            sourceVideo.src = fileURL;
+            sourceVideo.play();
+            document.getElementById('icon-play').className = "fa-solid fa-pause";
+            initWebAudio();
+        }
+
+        function toggleVideoPlay() {
+            initWebAudio();
+            if (!sourceVideo.src) return;
+            if (sourceVideo.paused) {
+                sourceVideo.play();
+                document.getElementById('icon-play').className = "fa-solid fa-pause";
+            } else {
+                sourceVideo.pause();
+                document.getElementById('icon-play').className = "fa-solid fa-play ml-0.5";
+            }
+        }
+
+        function seekVideo(val) {
+            if (!sourceVideo.duration) return;
+            sourceVideo.currentTime = (val / 100) * sourceVideo.duration;
+        }
+
+        sourceVideo.addEventListener('timeupdate', () => {
+            if (!sourceVideo.duration) return;
+            const current = sourceVideo.currentTime;
+            const duration = sourceVideo.duration;
+            document.getElementById('video-scrubber').value = (current / duration) * 100;
+            document.getElementById('time-current').innerText = formatTime(current);
+            document.getElementById('time-duration').innerText = formatTime(duration);
+        });
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function setAspectRatio(ratio) {
+            const viewport = document.getElementById('screen-viewport-box');
+            const btn43 = document.getElementById('btn-aspect-43');
+            const btn169 = document.getElementById('btn-aspect-169');
+
+            if (ratio === '4:3') {
+                viewport.className = "w-full aspect-crt-4-3 crt-curved-corners bg-black relative border-8 border-zinc-900 shadow-inner overflow-hidden flex items-center justify-center group";
+                btn43.className = "px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all bg-zinc-800 text-amber-400 border border-amber-500/30";
+                btn169.className = "px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all text-zinc-400 hover:text-zinc-200";
+            } else {
+                viewport.className = "w-full aspect-crt-16-9 crt-curved-corners bg-black relative border-8 border-zinc-900 shadow-inner overflow-hidden flex items-center justify-center group";
+                btn169.className = "px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all bg-zinc-800 text-amber-400 border border-amber-500/30";
+                btn43.className = "px-2.5 py-1.5 rounded-md font-mono text-xs font-bold transition-all text-zinc-400 hover:text-zinc-200";
+            }
+        }
+
+        function setCabinetStyle(style) {
+            const cabinet = document.getElementById('tv-cabinet');
+            const sidePanel = document.getElementById('tv-cabinet-side-panel');
+
+            if (style === 'wood') {
+                cabinet.className = "w-full max-w-4xl bg-wood-grain rounded-2xl p-4 sm:p-8 shadow-2xl border-4 border-amber-900/60 transition-all duration-300 relative flex flex-col md:flex-row gap-4 items-stretch";
+                sidePanel.classList.remove('hidden');
+            } else if (style === 'arcade') {
+                cabinet.className = "w-full max-w-4xl bg-arcade-casing rounded-xl p-4 sm:p-8 shadow-2xl border-4 border-zinc-800 transition-all duration-300 relative flex flex-col md:flex-row gap-4 items-stretch";
+                sidePanel.classList.remove('hidden');
+            } else if (style === 'portable') {
+                cabinet.className = "w-full max-w-4xl bg-portable-red rounded-3xl p-4 sm:p-8 shadow-2xl border-4 border-red-900 transition-all duration-300 relative flex flex-col md:flex-row gap-4 items-stretch";
+                sidePanel.classList.remove('hidden');
+            } else if (style === 'frameless') {
+                cabinet.className = "w-full max-w-3xl bg-transparent p-0 shadow-none border-0 transition-all duration-300 relative flex flex-col items-center";
+                sidePanel.classList.add('hidden');
+            }
+        }
+
+        function rotateChannelDial() {
+            channelIndex = (channelIndex % 12) + 1;
+            const deg = (channelIndex - 1) * 30;
+            document.getElementById('channel-dial-indicator').style.transform = `rotate(${deg}deg)`;
+            const chStr = channelIndex.toString().padStart(2, '0');
+            document.getElementById('dial-channel-num').innerText = `VHF ${chStr}`;
+            document.getElementById('osd-channel-tag').innerText = `CH ${chStr}`;
+        }
+
+        function updateShaderParam(param, val) {
+            const num = parseFloat(val);
+            shaderParams[param] = num;
+            const el = document.getElementById(`val-${param}`);
+            if (el) el.innerText = num.toFixed(param === 'chroma' ? 3 : 2);
+        }
+
+        function applyPreset(preset) {
+            if (preset === 'vhs80s') {
+                setShaderSliders({ curvature: 0.12, scanlines: 0.35, chroma: 0.008, vhs: 0.45, glow: 0.40, mask: 0.20, flicker: 0.10, colorMode: 0 });
+                setCabinetStyle('wood');
+            } else if (preset === 'showaTV') {
+                setShaderSliders({ curvature: 0.20, scanlines: 0.50, chroma: 0.005, vhs: 0.20, glow: 0.30, mask: 0.30, flicker: 0.20, colorMode: 0 });
+                setCabinetStyle('wood');
+            } else if (preset === 'arcade') {
+                setShaderSliders({ curvature: 0.05, scanlines: 0.60, chroma: 0.002, vhs: 0.00, glow: 0.20, mask: 0.60, flicker: 0.05, colorMode: 0 });
+                setCabinetStyle('arcade');
+            } else if (preset === 'bwTV') {
+                setShaderSliders({ curvature: 0.25, scanlines: 0.60, chroma: 0.000, vhs: 0.30, glow: 0.50, mask: 0.20, flicker: 0.30, colorMode: 1 });
+                setCabinetStyle('portable');
+            } else if (preset === 'retroWeb') {
+                setShaderSliders({ curvature: 0.08, scanlines: 0.20, chroma: 0.003, vhs: 0.05, glow: 0.15, mask: 0.15, flicker: 0.05, colorMode: 0 });
+                switchMainMode('web');
+            } else if (preset === 'junkNoise') {
+                setShaderSliders({ curvature: 0.30, scanlines: 0.70, chroma: 0.015, vhs: 0.90, glow: 0.60, mask: 0.40, flicker: 0.50, colorMode: 0 });
+            }
+        }
+
+        function setShaderSliders(params) {
+            Object.keys(params).forEach(p => {
+                shaderParams[p] = params[p];
+                const slider = document.getElementById(`slider-${p}`);
+                const valTxt = document.getElementById(`val-${p}`);
+                if (slider) slider.value = params[p];
+                if (valTxt) valTxt.innerText = params[p].toFixed(p === 'chroma' ? 3 : 2);
+            });
+            const modeSelect = document.getElementById('color-mode-select');
+            if (modeSelect) modeSelect.value = params.colorMode;
+        }
+
+        function switchControlTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+
+            const tabBtns = ['presets', 'shader', 'audio', 'frame'];
+            tabBtns.forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tab) {
+                    btn.className = "px-4 py-2 border-b-2 border-emerald-500 text-emerald-400 font-bold flex items-center gap-1.5 whitespace-nowrap";
+                } else {
+                    btn.className = "px-4 py-2 text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap";
+                }
+            });
+        }
+
+        function toggleScreenRecording() {
+            initWebAudio();
+            if (isRecording) {
+                stopScreenRecording();
+            } else {
+                startScreenRecording();
+            }
+        }
+
+        function startScreenRecording() {
+            recordedChunks = [];
+            const canvasStream = glCanvas.captureStream(30);
+            const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioDestination.stream.getAudioTracks()
+            ]);
+
+            try {
+                mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+            } catch (err) {
+                mediaRecorder = new MediaRecorder(combinedStream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = saveRecording;
+
+            mediaRecorder.start();
+            isRecording = true;
+
+            document.getElementById('text-record').innerText = '⏹ 録画停止 & 保存';
+            document.getElementById('osd-rec-status').classList.remove('hidden');
+            recordStartTime = Date.now();
+            recordTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+                document.getElementById('rec-timer').innerText = formatTime(elapsed);
+            }, 1000);
+        }
+
+        function stopScreenRecording() {
+            if (!mediaRecorder) return;
+            mediaRecorder.stop();
+            isRecording = false;
+
+            document.getElementById('text-record').innerText = '🔴 録画開始';
+            document.getElementById('osd-rec-status').classList.add('hidden');
+            clearInterval(recordTimerInterval);
+        }
+
+        function saveRecording() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `crt_tv_recording_${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function render(time) {
+            time *= 0.001; // convert to seconds
+
+            // Resize WebGL Canvas dynamically to parent size
+            const rect = glCanvas.getBoundingClientRect();
+            if (glCanvas.width !== rect.width || glCanvas.height !== rect.height) {
+                glCanvas.width = rect.width;
+                glCanvas.height = rect.height;
+                gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+            }
+
+            // Bind Source Texture (Video or Procedural SMPTE Pattern)
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            if (sourceVideo.src && !sourceVideo.paused && sourceVideo.readyState >= sourceVideo.HAVE_CURRENT_DATA) {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceVideo);
+            } else {
+                drawSMPTEPattern();
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, smpteCanvas);
+            }
+
+            // Set Shader Uniforms
+            gl.uniform1f(uLocations.uTime, time);
+            gl.uniform1f(uLocations.uCurvature, shaderParams.curvature);
+            gl.uniform1f(uLocations.uScanlines, shaderParams.scanlines);
+            gl.uniform1f(uLocations.uChroma, shaderParams.chroma);
+            gl.uniform1f(uLocations.uVHS, shaderParams.vhs);
+            gl.uniform1f(uLocations.uGlow, shaderParams.glow);
+            gl.uniform1f(uLocations.uMask, shaderParams.mask);
+            gl.uniform1f(uLocations.uFlicker, shaderParams.flicker);
+            gl.uniform1i(uLocations.uColorMode, shaderParams.colorMode);
+
+            // Draw Quad
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            requestAnimationFrame(render);
+        }
+
+        // Initialize App on Window Load
+        window.onload = function() {
+            // 1. Initialize WebGL Context and Compiled Shader Program
+            initWebGL();
+
+            // 2. Initial Draw of Procedural SMPTE Color Bar Test Pattern
+            drawSMPTEPattern();
+
+            // 3. User First Interaction Listener to Resume/Enable Web Audio Context
+            const initAudioOnUserInteraction = () => {
+                initWebAudio();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                window.removeEventListener('click', initAudioOnUserInteraction);
+                window.removeEventListener('keydown', initAudioOnUserInteraction);
+                window.removeEventListener('touchstart', initAudioOnUserInteraction);
+            };
+
+            window.addEventListener('click', initAudioOnUserInteraction);
+            window.addEventListener('keydown', initAudioOnUserInteraction);
+            window.addEventListener('touchstart', initAudioOnUserInteraction);
+
+            // 4. Start Render Animation Loop
+            requestAnimationFrame(render);
+        };
+    </script>
+</body>
+</html>
